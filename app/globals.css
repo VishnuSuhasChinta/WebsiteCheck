@@ -276,7 +276,7 @@ body {
 /* Secondary Stats — smaller cards below */
 .secondary-stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 12px;
   margin-top: 12px;
 }
@@ -806,7 +806,7 @@ body {
   }
 
   .secondary-stats {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .results-table th,

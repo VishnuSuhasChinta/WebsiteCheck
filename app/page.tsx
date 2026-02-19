@@ -302,12 +302,7 @@ export default function App() {
                             <div className="stat-label">Avg. Response</div>
                             <div className="stat-value-sm">{avgTime}ms</div>
                         </div>
-                        <div className="stat-card-sm">
-                            <div className="stat-label">Uptime</div>
-                            <div className="stat-value-sm">
-                                {results.length > 0 ? Math.round((upCount / results.length) * 100) : 0}%
-                            </div>
-                        </div>
+
                     </div>
                 </div>
             )}
