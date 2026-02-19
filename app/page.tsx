@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface ScanResult {
     name: string;
@@ -12,17 +12,32 @@ interface ScanResult {
 
 const STORAGE_KEY = "scan_results";
 const STORAGE_TIME_KEY = "scan_time";
+const AUTH_KEY = "wc_authenticated";
+const CORRECT_PASSWORD = "admin123";
 
-export default function Dashboard() {
+type View = "landing" | "auth" | "dashboard";
+
+export default function App() {
+    const [view, setView] = useState<View>("landing");
+    const [password, setPassword] = useState("");
+    const [authError, setAuthError] = useState(false);
+    const [authShake, setAuthShake] = useState(false);
+    const passwordRef = useRef<HTMLInputElement>(null);
+
+    // Dashboard state
     const [results, setResults] = useState<ScanResult[]>([]);
     const [scanning, setScanning] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [scanTime, setScanTime] = useState<string | null>(null);
     const [hasScanned, setHasScanned] = useState(false);
+    const [copied, setCopied] = useState(false);
 
-    // Restore cached results from sessionStorage on mount
+    // Check auth + restore cache on mount
     useEffect(() => {
         try {
+            if (sessionStorage.getItem(AUTH_KEY) === "true") {
+                setView("dashboard");
+            }
             const cached = sessionStorage.getItem(STORAGE_KEY);
             const cachedTime = sessionStorage.getItem(STORAGE_TIME_KEY);
             if (cached) {
@@ -31,15 +46,40 @@ export default function Dashboard() {
                 setHasScanned(true);
             }
         } catch {
-            // sessionStorage not available or corrupted, ignore
+            // ignore
         }
     }, []);
+
+    // Focus password input when auth modal opens
+    useEffect(() => {
+        if (view === "auth") {
+            setTimeout(() => passwordRef.current?.focus(), 100);
+        }
+    }, [view]);
+
+    const handleLogin = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (password === CORRECT_PASSWORD) {
+            setAuthError(false);
+            try {
+                sessionStorage.setItem(AUTH_KEY, "true");
+            } catch { /* ignore */ }
+            setView("dashboard");
+        } else {
+            setAuthError(true);
+            setAuthShake(true);
+            setTimeout(() => setAuthShake(false), 500);
+            setPassword("");
+            passwordRef.current?.focus();
+        }
+    };
 
     const runScan = async () => {
         setScanning(true);
         setError(null);
         setResults([]);
         setScanTime(null);
+        setCopied(false);
 
         try {
             const res = await fetch("/api/scan");
@@ -50,13 +90,10 @@ export default function Dashboard() {
             setScanTime(timestamp);
             setHasScanned(true);
 
-            // Cache to sessionStorage
             try {
                 sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
                 sessionStorage.setItem(STORAGE_TIME_KEY, timestamp);
-            } catch {
-                // storage full or unavailable, ignore
-            }
+            } catch { /* ignore */ }
         } catch (err) {
             setError(err instanceof Error ? err.message : "Scan failed. Please try again.");
         } finally {
@@ -66,6 +103,7 @@ export default function Dashboard() {
 
     const upCount = results.filter((r) => r.status === "UP").length;
     const downCount = results.filter((r) => r.status === "DOWN").length;
+    const downSites = results.filter((r) => r.status === "DOWN");
     const avgTime =
         results.length > 0
             ? Math.round(
@@ -76,17 +114,106 @@ export default function Dashboard() {
             )
             : 0;
 
+    const copyBrokenLinks = async () => {
+        const links = downSites.map((r) => r.url).join("\n");
+        try {
+            await navigator.clipboard.writeText(links);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch {
+            const ta = document.createElement("textarea");
+            ta.value = links;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand("copy");
+            document.body.removeChild(ta);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }
+    };
+
+    // ─── LANDING PAGE ───
+    if (view === "landing") {
+        return (
+            <div className="landing">
+                <div className="landing-content">
+                    <div className="landing-eyebrow">Infrastructure Monitoring</div>
+                    <h1 className="landing-title">Website Checker</h1>
+                    <p className="landing-desc">
+                        Instant diagnostics for your web infrastructure.
+                        <br />
+                        Identify broken pages before your users do.
+                    </p>
+                    <button
+                        className="landing-cta"
+                        onClick={() => setView("auth")}
+                    >
+                        Check Sites Now
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M5 12h14" />
+                            <path d="m12 5 7 7-7 7" />
+                        </svg>
+                    </button>
+                </div>
+                <footer className="landing-footer">
+                    Website Checker · Stateless Diagnostic Tool
+                </footer>
+            </div>
+        );
+    }
+
+    // ─── AUTH MODAL ───
+    if (view === "auth") {
+        return (
+            <div className="auth-backdrop">
+                <div className={`auth-card ${authShake ? "auth-shake" : ""}`}>
+                    <div className="auth-header">
+                        <h2>Website Checker</h2>
+                        <p>Enter the access password to continue.</p>
+                    </div>
+                    <form onSubmit={handleLogin} className="auth-form">
+                        <div className="auth-field">
+                            <label htmlFor="password-input">Password</label>
+                            <input
+                                ref={passwordRef}
+                                id="password-input"
+                                type="password"
+                                className={`auth-input ${authError ? "auth-input-error" : ""}`}
+                                placeholder="Enter password"
+                                value={password}
+                                onChange={(e) => {
+                                    setPassword(e.target.value);
+                                    setAuthError(false);
+                                }}
+                                autoComplete="off"
+                            />
+                            {authError && (
+                                <div className="auth-error-msg">Incorrect password. Try again.</div>
+                            )}
+                        </div>
+                        <button type="submit" className="auth-submit">
+                            Continue
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M5 12h14" />
+                                <path d="m12 5 7 7-7 7" />
+                            </svg>
+                        </button>
+                    </form>
+                    <button className="auth-back" onClick={() => { setView("landing"); setPassword(""); setAuthError(false); }}>
+                        ← Back
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    // ─── DASHBOARD ───
     return (
         <div className="container">
-            {/* Header */}
             <header className="header">
                 <div className="header-inner">
                     <div className="header-title-group">
-                        <span className="header-badge">
-                            <span className="header-badge-dot"></span>
-                            Diagnostic Tool
-                        </span>
-                        <h1>Website Integrity Scanner</h1>
+                        <h1>Website Checker</h1>
                         <p>One-click scan to check which pages are live and which are broken.</p>
                     </div>
                     <button
@@ -121,32 +248,72 @@ export default function Dashboard() {
                 </div>
             </header>
 
-            {/* Stats Bar */}
+            {/* Stats Section */}
             {hasScanned && !scanning && (
-                <div className="stats-bar">
-                    <div className="stat-card">
-                        <div className="stat-label">Total Sites</div>
-                        <div className="stat-value">{results.length}</div>
+                <div className="stats-section">
+                    <div className="hero-stats">
+                        <div className="hero-card hero-up">
+                            <div className="hero-card-header">
+                                <span className="hero-dot up-dot"></span>
+                                <span className="hero-label">Online</span>
+                            </div>
+                            <div className="hero-value up">{upCount}</div>
+                            <div className="hero-sub">of {results.length} sites responding</div>
+                        </div>
+                        <div className="hero-card hero-down">
+                            <div className="hero-card-header">
+                                <span className="hero-dot down-dot"></span>
+                                <span className="hero-label">Offline</span>
+                                {downCount > 0 && (
+                                    <button
+                                        className="copy-btn"
+                                        onClick={copyBrokenLinks}
+                                        title="Copy broken URLs to clipboard"
+                                    >
+                                        {copied ? (
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="20 6 9 17 4 12" />
+                                            </svg>
+                                        ) : (
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                                            </svg>
+                                        )}
+                                        {copied ? "Copied!" : "Copy Links"}
+                                    </button>
+                                )}
+                            </div>
+                            <div className="hero-value down">{downCount}</div>
+                            <div className="hero-sub">
+                                {downCount === 0
+                                    ? "All sites are healthy"
+                                    : `${downCount} site${downCount > 1 ? "s" : ""} unreachable`}
+                            </div>
+                        </div>
                     </div>
-                    <div className="stat-card">
-                        <div className="stat-label">Online</div>
-                        <div className="stat-value up">{upCount}</div>
-                    </div>
-                    <div className="stat-card">
-                        <div className="stat-label">Offline</div>
-                        <div className="stat-value down">{downCount}</div>
-                    </div>
-                    <div className="stat-card">
-                        <div className="stat-label">Avg. Response</div>
-                        <div className="stat-value">{avgTime}ms</div>
+
+                    <div className="secondary-stats">
+                        <div className="stat-card-sm">
+                            <div className="stat-label">Total Sites</div>
+                            <div className="stat-value-sm">{results.length}</div>
+                        </div>
+                        <div className="stat-card-sm">
+                            <div className="stat-label">Avg. Response</div>
+                            <div className="stat-value-sm">{avgTime}ms</div>
+                        </div>
+                        <div className="stat-card-sm">
+                            <div className="stat-label">Uptime</div>
+                            <div className="stat-value-sm">
+                                {results.length > 0 ? Math.round((upCount / results.length) * 100) : 0}%
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
 
-            {/* Error */}
             {error && <div className="error-state">{error}</div>}
 
-            {/* Scanning State */}
             {scanning && (
                 <div className="scanning-overlay">
                     <div className="scanning-spinner"></div>
@@ -156,7 +323,6 @@ export default function Dashboard() {
                 </div>
             )}
 
-            {/* Empty State */}
             {!hasScanned && !scanning && !error && (
                 <div className="empty-state">
                     <div className="empty-state-icon">
@@ -175,11 +341,10 @@ export default function Dashboard() {
                         </svg>
                     </div>
                     <h2>No scan results yet</h2>
-                    <p>Click "Run Scan" to check website availability.</p>
+                    <p>Click &quot;Run Scan&quot; to check website availability.</p>
                 </div>
             )}
 
-            {/* Results Table */}
             {hasScanned && !scanning && results.length > 0 && (
                 <>
                     <div className="table-wrapper">
@@ -250,9 +415,8 @@ export default function Dashboard() {
                 </>
             )}
 
-            {/* Footer */}
             <footer className="footer">
-                Website Integrity Scanner · MVP v1.0 · Stateless Diagnostic Tool
+                Website Checker · Stateless Diagnostic Tool
             </footer>
         </div>
     );

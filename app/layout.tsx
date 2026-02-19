@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-    title: "Website Integrity Scanner",
-    description: "One-click website availability scanner for college infrastructure",
+    title: "Website Checker",
+    description: "Instant diagnostics for your web infrastructure",
 };
 
 export default function RootLayout({

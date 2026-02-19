@@ -36,10 +36,7 @@ export const sites: Site[] = [
     { name: "Avalokana Data Lake", url: "https://avalokana.karnataka.gov.in/DataLake/DataLake" },
     { name: "Summer Internship", url: "https://www.iiitb.ac.in/summer-internship" },
     { name: "broken ivalid", url: "https://invalidnsoojxsslhslsllsxlsjxsnsxjn.com" },
-
     { name: "broken ivalid", url: "https://httpstat.us/404" },
-    { name: "broken ivalid", url: "https://httpstat.us/500" },
-    { name: "broken ivalid", url: "https://this-domain-does-not-exist-123456789.com" }
-
-
+    { name: "broken ivalid", url: "https://httpstat.us/200" },
+    { name: "broken ivalid", url: "https://northsystems.org" }
 ];
