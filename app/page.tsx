@@ -31,6 +31,7 @@ export default function App() {
     const [scanTime, setScanTime] = useState<string | null>(null);
     const [hasScanned, setHasScanned] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
 
     // Check auth + restore cache on mount
     useEffect(() => {
@@ -113,6 +114,16 @@ export default function App() {
                 (results.filter((r) => r.responseTime !== null).length || 1)
             )
             : 0;
+
+    // Filter results based on search query (case-insensitive substring match)
+    const filteredResults = results.filter((r) => {
+        if (!searchQuery.trim()) return true;
+        const query = searchQuery.toLowerCase().trim();
+        return (
+            r.name.toLowerCase().includes(query) ||
+            r.url.toLowerCase().includes(query)
+        );
+    });
 
     const copyBrokenLinks = async () => {
         const links = downSites.map((r) => r.url).join("\n");
@@ -342,6 +353,62 @@ export default function App() {
 
             {hasScanned && !scanning && results.length > 0 && (
                 <>
+                    {/* Search Bar */}
+                    <div className="search-bar-wrapper">
+                        <div className="search-bar">
+                            <div className="search-icon">
+                                <svg
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                >
+                                    <circle cx="11" cy="11" r="8" />
+                                    <path d="m21 21-4.35-4.35" />
+                                </svg>
+                            </div>
+                            <input
+                                id="search-input"
+                                type="text"
+                                className="search-input"
+                                placeholder="Search by site name or URL…"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                autoComplete="off"
+                                spellCheck={false}
+                            />
+                            {searchQuery && (
+                                <button
+                                    className="search-clear"
+                                    onClick={() => setSearchQuery("")}
+                                    title="Clear search"
+                                >
+                                    <svg
+                                        width="14"
+                                        height="14"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2.5"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    >
+                                        <path d="M18 6 6 18" />
+                                        <path d="m6 6 12 12" />
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
+                        {searchQuery && (
+                            <div className="search-results-count">
+                                {filteredResults.length} of {results.length} site{results.length !== 1 ? "s" : ""}
+                            </div>
+                        )}
+                    </div>
                     <div className="table-wrapper">
                         <table className="results-table" id="results-table">
                             <thead>
@@ -354,7 +421,7 @@ export default function App() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {results.map((result, i) => (
+                                {filteredResults.map((result, i) => (
                                     <tr key={i}>
                                         <td>
                                             <span className="site-name">{result.name}</span>
